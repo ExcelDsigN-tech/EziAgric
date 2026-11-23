@@ -49,6 +49,7 @@ To provide a programmable safety net for regional commodity trading. Amana ensur
 - **Storage:** IPFS (via Pinata) for decentralized storage of video evidence.
 - **Database:** Supabase (Off-chain metadata, driver logs, and user profiles).
 - **Observability:** OpenTelemetry distributed tracing with correlation IDs for end-to-end request tracking.
+- **Feature flags:** Admin-controlled toggles. Partially documented; see [docs/feature-flags.md](./docs/feature-flags.md) for status and gaps.
 
 ## 🧪 Local Environments (Folder-Based)
 
