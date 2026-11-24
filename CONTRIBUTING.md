@@ -24,19 +24,22 @@ Use the following inline syntax inside Markdown docs:
 
 | Reference kind | Syntax | Example |
 | --- | --- | --- |
-| File path | `` `path/to/file.ext` `` | `` `backend/src/server.ts` `` |
-| Endpoint | `@endpoint METHOD /path` | `@endpoint GET /api/health` |
-| CLI flag | `@flag --name` | `@flag --verbose` |
+| File path | `` `path/to/file.ext` `` | `` `backend/src/routes/job-health.routes.ts` `` |
+| Endpoint | `` `@endpoint <METHOD> <path>` `` | `` `@endpoint GET /health/jobs` `` |
+| CLI flag | `` `@flag <--flag>` `` | `` `@flag --dry-run` `` |
 
 Rules of thumb:
 
-- Reference files by their repository-relative path, wrapped in backticks.
-- Reference endpoints with `@endpoint <METHOD> <path>`; the path must match a
-  route registered in the codebase.
-- Reference CLI flags with `@flag <--flag>`; the flag must be declared in the
-  relevant argument parser.
+- Reference files by their repository-relative path, wrapped in backticks. The
+  path must include a directory and a file extension.
+- Reference endpoints with `@endpoint <METHOD> <path>`; a route registered with
+  that method under `backend/src/` must match the path. Mount prefixes may be
+  omitted from the registration, so `GET /health/jobs` matches `router.get("/jobs")`.
+- Reference CLI flags with `` `@flag --name` ``; the flag must appear as a literal
+  in `scripts/`, `backend/scripts/` or `backend/src/`.
 - Prefer linking to a stable anchor (a file, a route, a flag) over quoting
   snippets that will drift.
+- Text inside fenced code blocks is not checked.
 
 ### Checking your references
 
@@ -44,13 +47,13 @@ The documentation checker validates every anchored reference against the
 codebase. Run it locally before opening a PR:
 
 ```sh
-node scripts/check-docs.mjs
+node scripts/check-doc-refs.mjs
 ```
 
 The checker runs automatically in CI on pull requests that touch documentation
 and **blocks newly broken references**. If a reference is intentionally stale
-(for example, a historical ADR that describes a removed endpoint), add the doc
-to the whitelist in `scripts/check-docs.mjs` with a short comment explaining why.
+(for example, a historical ADR that describes a removed file), add an entry to
+`references` in `.github/doc-refs-whitelist.json` with a reason explaining why.
 
 ### Ownership and staleness
 

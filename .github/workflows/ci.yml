@@ -82,7 +82,7 @@ jobs:
               - 'docs/**'
               - 'README.md'
               - 'CONTRIBUTING.md'
-              - 'scripts/check-architecture-diagrams.mjs'
+              - 'scripts/check-architecture-links.mjs'
               - 'scripts/check-doc-refs.mjs'
 
   docs-architecture:
@@ -102,7 +102,7 @@ jobs:
 
       - name: Check architecture diagrams (syntax, previews, links)
         if: needs.changes.outputs.docs == 'true'
-        run: node scripts/check-architecture-diagrams.mjs
+        run: node scripts/check-architecture-links.mjs
 
       - name: Check documentation references
         if: needs.changes.outputs.docs == 'true'
