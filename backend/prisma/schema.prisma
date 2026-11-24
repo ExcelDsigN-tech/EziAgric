@@ -731,3 +731,17 @@ model EscrowAudit {
   @@index([tradeId, createdAt])
   @@index([eventType])
 }
+
+/// TradeAuditLog is an append-only evidence trail of trade state transitions.
+/// Rows are immutable: UPDATE, DELETE and TRUNCATE are rejected by database triggers (see migration).
+model TradeAuditLog {
+  id        Int      @id @default(autoincrement())
+  tradeId   String   @map("trade_id") @db.VarChar(255)
+  eventType String   @map("event_type") @db.VarChar(100)
+  actorId   String?  @map("actor_id") @db.VarChar(255)
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  @@map("trade_audit_log")
+  @@index([tradeId, timestamp])
+}
