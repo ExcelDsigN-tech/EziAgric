@@ -1,7 +1,7 @@
 //! Dispute lifecycle: initiation, single-mediator and quorum resolution,
 //! fallback resolution and evidence submission.
 
-use soroban_sdk::{Address, Bytes, Env, String, Vec, contractimpl, token};
+use soroban_sdk::{Address, Bytes, Env, Strin     g, Vec, contractimpl, token};
 
 use crate::*;
 
