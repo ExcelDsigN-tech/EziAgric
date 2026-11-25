@@ -17,6 +17,7 @@ jobs:
   mutation-money-math:
     name: StrykerJS — feeComputation + lossAllocation
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: backend
