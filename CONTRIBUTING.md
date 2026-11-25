@@ -76,6 +76,16 @@ stale docs; keep it clean or triage the entries.
 ## Questions
 
 If anything here is unclear, open an issue and we will improve this guide.
+
+## Snapshot Testing (Mobile)
+
+The mobile app uses Jest snapshot tests to detect UI regressions. When adding or modifying components in `mobile/src/screens/`, update snapshots after changes:
+
+```sh
+cd mobile && npm test -- --updateSnapshot
+```
+
+Review all snapshot changes in PRs to ensure they reflect intended UI changes. Commit updated snapshots alongside code changes.
 # Contributing to EziAgric
 
 ## Picking up an issue (Drips Wave)
