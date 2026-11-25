@@ -70,3 +70,6 @@ impl PlatformContract {
 
 #[cfg(test)]
 mod test;
+
+#[cfg(test)]
+mod lifecycle_test;
