@@ -1,9 +1,20 @@
 import { Router, Request, Response } from 'express';
 import { idempotency, recordIdempotencyKey } from '../middleware/idempotency';
+import { rateLimit } from '../middleware/rateLimit';
 
 const router = Router();
 
-router.post('/trades', idempotency, async (req: Request, res: Response) => {
+const tradesLimiter = rateLimit({
+  limit: 10,
+  windowMs: 60_000,
+  keyPrefix: 'trades',
+  keyGenerator: (req: Request) => {
+    const user = (req as Request & { user?: { id?: string | number } }).user;
+    return user?.id !== undefined ? String(user.id) : undefined;
+  },
+});
+
+router.post('/trades', tradesLimiter, idempotency, async (req: Request, res: Response) => {
   try {
     const trade = await createTrade(req.body);
 
