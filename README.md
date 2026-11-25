@@ -403,3 +403,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 <!-- handsoff-issue-912 -->
 - #912: [Contracts] Add get_trade_count view function
+
+<!-- handsoff-issue-913 -->
+- #913: [Contracts] Add configurable evidence submission deadline
