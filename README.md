@@ -406,3 +406,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 <!-- handsoff-issue-913 -->
 - #913: [Contracts] Add configurable evidence submission deadline
+
+<!-- handsoff-issue-914 -->
+- #914: [Contracts] Add pause/unpause admin entrypoints for emergency stops
