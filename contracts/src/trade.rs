@@ -14,6 +14,14 @@ pub enum TradeStatus {
 }
 
 /// A trade record stored on-chain.
+///
+/// # Storage layout / migration note
+/// `created_at` (the ledger timestamp captured when the trade was created) was
+/// added to this struct. Existing persisted `Trade` entries written before this
+/// field existed must be migrated: re-serialize each stored trade with
+/// `created_at` populated (use the trade's creation ledger timestamp if known,
+/// otherwise `0`). Consumers reading `get_trade` should treat `created_at == 0`
+/// as "unknown / pre-migration".
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Trade {
@@ -87,7 +95,8 @@ pub fn validate_create_trade_args(
 /// Construct a validated `Trade` record.
 ///
 /// Returns the same error variants as [`validate_create_trade_args`] for
-/// invalid inputs and never panics on arbitrary numeric inputs.
+/// invalid inputs and never panics on arbitrary numeric inputs. The trade's
+/// `created_at` is set to the current ledger timestamp.
 pub fn build_trade(
     env: &Env,
     id: u64,
