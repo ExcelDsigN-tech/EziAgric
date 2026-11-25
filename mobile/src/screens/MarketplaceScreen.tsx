@@ -17,6 +17,7 @@ import type { RootStackParamList } from '../types/navigation';
 import type { Listing, ListingFilters } from '../types/listing';
 import { useListings } from '../hooks/useListings';
 import { FALLBACK_COMMODITIES, referenceApi, type ReferenceItem } from '../api/reference';
+import EmptyState from '../components/EmptyState';
 
 type Props = StackScreenProps<RootStackParamList, 'Marketplace'>;
 
@@ -206,6 +207,38 @@ export default function MarketplaceScreen({ navigation }: Props) {
   );
 
   const activeCount = countActiveFilters(filters);
+  const hasQuery = !!filters.q || activeCount > 0;
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setFilters({});
+  }, []);
+
+  const renderEmpty = () => {
+    if (isLoading) return null;
+    if (hasQuery) {
+      return (
+        <EmptyState
+          illustration={<Text style={styles.emptyIllustration}>🔍</Text>}
+          heading="No listings yet"
+          message="No listings match your search or filters."
+          ctaLabel="Clear filters"
+          onCtaPress={clearFilters}
+          testID="empty-state-filtered"
+        />
+      );
+    }
+    return (
+      <EmptyState
+        illustration={<Text style={styles.emptyIllustration}>🌾</Text>}
+        heading="No listings yet"
+        message="Be the first to post a listing on the marketplace."
+        ctaLabel="Post listing"
+        onCtaPress={() => navigation.navigate('CreateListing')}
+        testID="empty-state-default"
+      />
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -215,50 +248,47 @@ export default function MarketplaceScreen({ navigation }: Props) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Marketplace</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')} testID="create-listing-btn">
-            <Text style={styles.link}>+ List</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')} testID="header-post-listing">
+            <Text style={styles.link}>Post</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSheetOpen(true)} testID="open-filters">
+          <TouchableOpacity onPress={() => setSheetOpen(true)} testID="header-filters">
             <Text style={styles.link}>Filters{activeCount > 0 ? ` (${activeCount})` : ''}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <TextInput
-        style={styles.search}
-        placeholder="Search listings…"
-        value={search}
-        onChangeText={setSearch}
-        testID="marketplace-search"
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.input}
+          placeholder="Search listings"
+          value={search}
+          onChangeText={setSearch}
+          testID="marketplace-search"
+        />
+      </View>
 
-      {isLoading ? (
-        <ActivityIndicator style={styles.loader} size="large" testID="marketplace-loading" />
+      {error ? (
+        <View style={styles.center}>
+          <Text style={styles.error}>{error}</Text>
+          <TouchableOpacity onPress={refresh}>
+            <Text style={styles.link}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" />
+        </View>
       ) : (
         <FlatList
           data={listings}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <ListingCard listing={item} onPress={() => openListing(item)} />}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={refresh}
-              testID="marketplace-refresh"
-            />
-          }
+          contentContainerStyle={listings.length === 0 ? styles.emptyList : styles.list}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} />}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={
-            isLoadingMore ? <ActivityIndicator style={styles.loader} testID="marketplace-loading-more" /> : null
-          }
-          ListEmptyComponent={
-            error ? (
-              <Text style={styles.error}>{error}</Text>
-            ) : (
-              <Text style={styles.empty}>No listings match your filters.</Text>
-            )
-          }
+          ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footer} /> : null}
         />
       )}
 
@@ -276,7 +306,7 @@ export default function MarketplaceScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,74 +314,69 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937' },
   headerActions: { flexDirection: 'row', gap: 16 },
-  link: { color: '#2563eb', fontSize: 14 },
-  search: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-  },
-  listContent: { paddingHorizontal: 16, paddingBottom: 24 },
-  card: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  commodity: { fontSize: 16, fontWeight: '600' },
-  price: { fontSize: 14, color: '#111827' },
-  meta: { fontSize: 13, color: '#6b7280', marginTop: 4 },
-  loader: { marginTop: 24 },
-  empty: { textAlign: 'center', color: '#6b7280', marginTop: 32 },
-  error: { color: '#dc2626', marginTop: 8 },
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    maxHeight: '80%',
-  },
-  sheetTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  chipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  chipText: { fontSize: 13, color: '#374151' },
-  chipTextActive: { color: '#fff' },
+  searchRow: { paddingHorizontal: 16, paddingBottom: 8 },
   input: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#D1D5DB',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    flex: 1,
+    fontSize: 14,
   },
-  priceInput: { marginRight: 8 },
+  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  emptyList: { flexGrow: 1 },
+  card: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  commodity: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  price: { fontSize: 14, fontWeight: '600', color: '#16A34A' },
+  meta: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  footer: { marginVertical: 16 },
+  error: { color: '#DC2626', fontSize: 13, marginTop: 8 },
+  link: { color: '#16A34A', fontSize: 14, fontWeight: '600' },
+  emptyIllustration: { fontSize: 48 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#1F2937' },
   sheetActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 16,
+    justifyContent: 'space-between',
     marginTop: 16,
   },
+  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  chipText: { fontSize: 13, color: '#374151' },
+  chipTextActive: { color: '#FFFFFF' },
+  priceInput: { flex: 1, marginRight: 8 },
   applyBtn: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
   },
   applyBtnDisabled: { opacity: 0.5 },
-  applyText: { color: '#fff', fontWeight: '600' },
+  applyText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
 });
