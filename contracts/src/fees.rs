@@ -6,6 +6,7 @@ use soroban_sdk::{contracttype, Address, Env};
 pub enum FeeKey {
     PlatformFeeBps,
     FeeAddress,
+    TotalFeesCollected,
 }
 
 /// Default platform fee in basis points (0 = no fee).
@@ -36,4 +37,20 @@ pub fn set_fee_address(env: &Env, address: &Address) {
     env.storage()
         .instance()
         .set(&FeeKey::FeeAddress, address);
+}
+
+/// Read the cumulative total of fees collected across all settlements.
+pub fn get_total_fees(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&FeeKey::TotalFeesCollected)
+        .unwrap_or(0)
+}
+
+/// Add `amount` to the cumulative fee counter.
+pub fn add_total_fees(env: &Env, amount: i128) {
+    let total = get_total_fees(env) + amount;
+    env.storage()
+        .instance()
+        .set(&FeeKey::TotalFeesCollected, &total);
 }
