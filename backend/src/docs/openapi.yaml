@@ -41,6 +41,11 @@ tags:
   - name: Audit Trail
   - name: Treasury
   - name: Goals
+  - name: Watchlist
+  - name: Reputation
+  - name: Templates
+  - name: Cooperatives
+  - name: Notifications
 components:
   securitySchemes:
     bearerAuth:
@@ -3136,6 +3141,71 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GoalsAnalyticsResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /watchlist:
+    get:
+      tags: [Watchlist]
+      summary: List watchlisted trades
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Watchlist returned.
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /reputation:
+    get:
+      tags: [Reputation]
+      summary: Get reputation score for authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Reputation data returned.
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /templates:
+    get:
+      tags: [Templates]
+      summary: List trade templates
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Templates returned.
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /cooperatives:
+    get:
+      tags: [Cooperatives]
+      summary: List cooperatives
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cooperatives returned.
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List in-app notifications for authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notifications returned.
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "500":
