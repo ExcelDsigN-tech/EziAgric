@@ -155,7 +155,8 @@ export const envSchema = z.object({
   INBOUND_WEBHOOK_SECRETS: z.string().optional(),
   // Replay window, in seconds, for the signed inbound webhook timestamp.
   INBOUND_WEBHOOK_TOLERANCE_SECONDS: z.coerce.number().int().positive().default(300),
-  WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  // 1 initial attempt + up to 3 retries on non-2xx/network errors.
+  WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().positive().default(4),
   WEBHOOK_RETRY_BASE_MS: z.coerce.number().int().positive().default(1000),
   WEBHOOK_RETRY_MAX_MS: z.coerce.number().int().positive().default(30000),
   ADMIN_STATS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
@@ -326,7 +327,7 @@ export function collectEnvIssues(
 
   const parsed = envSchema.safeParse(normalized);
   if (!parsed.success) {
-    for (const err of parsed.error.errors) {
+    for (const err of parsed.error.issues) {
       const key = String(err.path[0] ?? '');
       issues.push({
         key,

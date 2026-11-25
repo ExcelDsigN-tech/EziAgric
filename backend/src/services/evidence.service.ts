@@ -5,6 +5,7 @@ import { prisma as defaultPrisma } from "../lib/db";
 import { IPFSService, ServiceUnavailableError } from "./ipfs.service";
 import { getAdminAllowlistLowercase } from "../lib/accessControl";
 import { env } from "../config/env";
+import { appLogger } from "../middleware/logger";
 import { enqueueEvidenceTranscode } from "../jobs/evidenceTranscode.job";
 
 export class EvidenceAccessDeniedError extends Error {
@@ -38,6 +39,25 @@ export class EvidenceHashMismatchError extends Error {
         this.name = "EvidenceHashMismatchError";
     }
 }
+
+export class EvidenceNotFoundError extends Error {
+    status = 404;
+    constructor() {
+        super("Evidence not found");
+        this.name = "EvidenceNotFoundError";
+    }
+}
+
+export class EvidenceRetractionConflictError extends Error {
+    status = 409;
+    constructor(message: string) {
+        super(message);
+        this.name = "EvidenceRetractionConflictError";
+    }
+}
+
+/** Sellers may retract evidence for this long after uploading it. */
+export const EVIDENCE_RETRACTION_WINDOW_MS = 60 * 60 * 1000;
 
 export class EvidenceScanError extends Error {
     status = 503;
@@ -83,7 +103,7 @@ export function computeSha256(buffer: Buffer): string {
 
 type EvidenceDatabase = {
     trade: Pick<PrismaClient["trade"], "findUnique">;
-    tradeEvidence: Pick<PrismaClient["tradeEvidence"], "findMany" | "create">;
+    tradeEvidence: Pick<PrismaClient["tradeEvidence"], "findMany" | "create" | "findUnique" | "updateMany">;
 };
 
 export class EvidenceService {
@@ -122,7 +142,7 @@ export class EvidenceService {
         }
 
         const records = await this.prisma.tradeEvidence.findMany({
-            where: { tradeId },
+            where: { tradeId, deletedAt: null },
             orderBy: { createdAt: "asc" },
         });
 
@@ -157,6 +177,43 @@ export class EvidenceService {
                 retentionExpired,
             };
         });
+    }
+
+    /**
+     * Soft-delete evidence the caller uploaded, within the retraction window
+     * and before the buyer confirms delivery (trade leaves FUNDED).
+     */
+    async retractEvidence(evidenceId: number, callerAddress: string, now = new Date()) {
+        const evidence = await this.prisma.tradeEvidence.findUnique({
+            where: { id: evidenceId },
+            include: { trade: { select: { status: true, deliveredAt: true } } },
+        });
+        if (!evidence || evidence.deletedAt) throw new EvidenceNotFoundError();
+
+        if (evidence.uploadedBy.toLowerCase() !== callerAddress.toLowerCase()) {
+            throw new EvidenceAccessDeniedError();
+        }
+
+        const { status, deliveredAt } = evidence.trade;
+        if (deliveredAt || (status !== "CREATED" && status !== "FUNDED")) {
+            throw new EvidenceRetractionConflictError("Buyer has already confirmed delivery");
+        }
+        if (now.getTime() - evidence.createdAt.getTime() > EVIDENCE_RETRACTION_WINDOW_MS) {
+            throw new EvidenceRetractionConflictError("Retraction window has elapsed");
+        }
+
+        // Guard on deletedAt so concurrent retractions only succeed once.
+        const { count } = await this.prisma.tradeEvidence.updateMany({
+            where: { id: evidenceId, deletedAt: null },
+            data: { deletedAt: now },
+        });
+        if (count === 0) throw new EvidenceNotFoundError();
+
+        appLogger.info(
+            { event: "EvidenceRetracted", evidenceId, tradeId: evidence.tradeId, retractedBy: callerAddress },
+            "Evidence retracted by uploader",
+        );
+        return { id: evidenceId, tradeId: evidence.tradeId, retractedAt: now };
     }
 
     /**

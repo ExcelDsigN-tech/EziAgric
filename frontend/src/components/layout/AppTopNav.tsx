@@ -6,6 +6,12 @@ import { usePathname } from "next/navigation";
 import { NavLink } from "@/components/ui/Navigation";
 import { Badge } from "@/components/ui/Badge";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useFreighterIdentity } from "@/hooks/useFreighterIdentity";
+
+/** GCDEFG...WXYZ → "GCDE...WXYZ" so users can verify the active account. */
+export function truncateAddress(address: string): string {
+  return address.length <= 8 ? address : `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
 
 interface AppTopNavProps {
   onToggleSidebar?: () => void;
@@ -28,6 +34,19 @@ export function AppTopNav({
 }: AppTopNavProps) {
   const pathname = usePathname();
   const isAdmin = useIsAdmin();
+  const { address, connectWallet } = useFreighterIdentity();
+  const [copied, setCopied] = React.useState(false);
+
+  const copyAddress = async () => {
+    if (!address) return;
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard can be blocked (permissions/insecure context); the address stays visible.
+    }
+  };
 
   return (
     <header className="h-14 bg-card border-b border-border-default flex items-center px-4 lg:px-6 gap-4 lg:gap-8 flex-shrink-0">
@@ -79,6 +98,27 @@ export function AppTopNav({
           <Badge variant="locked" size="sm">
             Admin
           </Badge>
+        )}
+
+        {/* Wallet */}
+        {address ? (
+          <button
+            type="button"
+            onClick={copyAddress}
+            title={address}
+            aria-label={copied ? "Wallet address copied" : `Copy wallet address ${address}`}
+            className="h-8 px-3 rounded-full bg-elevated border border-border-default font-mono text-xs text-text-primary hover:border-gold transition-all"
+          >
+            {copied ? "Copied" : truncateAddress(address)}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void connectWallet()}
+            className="h-8 px-3 rounded-full bg-gold text-xs font-semibold text-black hover:opacity-90 transition-all"
+          >
+            Connect Wallet
+          </button>
         )}
 
         {/* Notification bell */}

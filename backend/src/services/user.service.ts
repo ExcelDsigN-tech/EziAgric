@@ -2,6 +2,8 @@ import { getSupabaseClient } from "../lib/supabase";
 import { retryAsync } from "../lib/retry";
 import { UpdateProfileInput, updateProfileSchema } from "../validators/user.validators";
 import { AppError, ErrorCode } from "../errors/errorCodes";
+import { normalizePhoneE164 } from "../validators/phone.validators";
+import { sendSms } from "./smsService";
 import { StrKey } from "@stellar/stellar-sdk";
 import { createHmac, randomInt, timingSafeEqual } from "crypto";
 
@@ -75,11 +77,11 @@ function decryptPhone(payload: string): string {
 }
 
 function normalizePhone(phone: string): string {
-  const trimmed = phone.trim();
-  if (!/^\+?[1-9]\d{6,14}$/.test(trimmed)) {
+  const normalized = normalizePhoneE164(phone);
+  if (!normalized) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Invalid phone number', 400);
   }
-  return trimmed;
+  return normalized;
 }
 
 /**
@@ -113,7 +115,7 @@ export async function sendPhoneOtp(address: string, phone: string) {
     }
 
     if ((count ?? 0) >= OTP_MAX_SENDS_PER_WINDOW) {
-      throw new AppError(ErrorCode.RATE_LIMITED, 'Too many OTP requests, try again later', 429);
+      throw new AppError(ErrorCode.RATE_LIMIT_EXCEEDED, 'Too many OTP requests, try again later', 429);
     }
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -178,7 +180,7 @@ export async function verifyPhoneOtp(address: string, code: string) {
       throw new AppError(ErrorCode.INFRA_ERROR, 'Failed to check verify rate limit', 500);
     }
     if ((count ?? 0) >= OTP_MAX_VERIFIES_PER_WINDOW) {
-      throw new AppError(ErrorCode.RATE_LIMITED, 'Too many verification attempts, try again later', 429);
+      throw new AppError(ErrorCode.RATE_LIMIT_EXCEEDED, 'Too many verification attempts, try again later', 429);
     }
 
     await retryAsync(
@@ -214,7 +216,7 @@ export async function verifyPhoneOtp(address: string, code: string) {
     }
 
     if ((otp.attempts ?? 0) >= OTP_MAX_ATTEMPTS) {
-      throw new AppError(ErrorCode.RATE_LIMITED, 'OTP attempt limit exceeded', 429);
+      throw new AppError(ErrorCode.RATE_LIMIT_EXCEEDED, 'OTP attempt limit exceeded', 429);
     }
 
     const expected = Buffer.from(otp.code_hash, 'hex');
@@ -271,36 +273,6 @@ export async function verifyPhoneOtp(address: string, code: string) {
   } catch (error: any) {
     if (error.name === 'AppError') throw error;
     throw new AppError(ErrorCode.INFRA_ERROR, 'OTP verification failed', 503);
-  }
-}
-
-/**
- * Send an SMS through the configured provider.
- * Falls back to a no-op log when no provider is configured (dev/test).
- */
-async function sendSms(phone: string, message: string): Promise<void> {
-  const endpoint = process.env.SMS_PROVIDER_URL;
-  const apiKey = process.env.SMS_PROVIDER_API_KEY;
-
-  if (!endpoint || !apiKey) {
-    // No provider configured — do not leak the code in production logs.
-    if (process.env.NODE_ENV !== 'production') {
-      console.info(`[sms:dev] to=${phone} message=${message}`);
-    }
-    return;
-  }
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ to: phone, message }),
-  });
-
-  if (!response.ok) {
-    throw new AppError(ErrorCode.INFRA_ERROR, 'SMS provider rejected the request', 502);
   }
 }
 

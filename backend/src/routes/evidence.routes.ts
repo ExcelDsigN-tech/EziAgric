@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
+import { z } from "zod";
 import { authMiddleware } from "../middleware/auth.middleware";
 import { AuthRequest } from "../services/auth.service";
 import {
@@ -8,6 +9,8 @@ import {
     EvidenceTradeNotFoundError,
     EvidenceScanError,
     EvidenceHashMismatchError,
+    EvidenceNotFoundError,
+    EvidenceRetractionConflictError,
 } from "../services/evidence.service";
 import { appLogger } from "../middleware/logger";
 import { validateRequest } from "../middleware/validateRequest";
@@ -20,6 +23,10 @@ import { tradeIdParamSchema } from "../schemas/trade.schemas";
 import { env } from "../config/env";
 import { createWalletRateLimiter } from "../lib/rateLimit";
 import { RATE_LIMIT_CONFIG } from "../config/rateLimit";
+
+const evidenceIdParamSchema = z.object({
+    id: z.string().regex(/^\d+$/, "Evidence ID must be numeric"),
+});
 
 const evidenceUploadLimiter = createWalletRateLimiter(RATE_LIMIT_CONFIG.evidenceUpload);
 
@@ -169,6 +176,34 @@ export function createEvidenceRouter(evidenceService = new EvidenceService()) {
                     return;
                 }
                 if (err instanceof EvidenceScanError) {
+                    res.status(err.status).json({ error: err.message });
+                    return;
+                }
+                throw err;
+            }
+        },
+    );
+
+    // DELETE /evidence/:id — seller retracts their own evidence (1h window, pre-confirmation)
+    router.delete(
+        "/evidence/:id",
+        authMiddleware,
+        validateRequest({ params: evidenceIdParamSchema }),
+        async (req: AuthRequest, res: Response) => {
+            const callerAddress = req.user?.walletAddress;
+            if (!callerAddress) {
+                res.status(401).json({ error: "Unauthorized" });
+                return;
+            }
+            try {
+                const result = await evidenceService.retractEvidence(Number(req.params.id), callerAddress);
+                res.status(200).json(result);
+            } catch (err) {
+                if (
+                    err instanceof EvidenceNotFoundError ||
+                    err instanceof EvidenceAccessDeniedError ||
+                    err instanceof EvidenceRetractionConflictError
+                ) {
                     res.status(err.status).json({ error: err.message });
                     return;
                 }
