@@ -409,3 +409,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 <!-- handsoff-issue-914 -->
 - #914: [Contracts] Add pause/unpause admin entrypoints for emergency stops
+
+<!-- handsoff-issue-915 -->
+- #915: [Contracts] Write Rustdoc for dispute.rs public functions
