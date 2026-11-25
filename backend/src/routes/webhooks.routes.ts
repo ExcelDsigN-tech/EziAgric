@@ -22,17 +22,15 @@ const createWebhookSchema = z.object({
   events: z
     .array(z.enum(TRADE_EVENT_TYPES))
     .min(1, 'At least one event is required'),
-  secret: z.string().optional(),
+  // Signing key; stored as-is, so bound it to the column width.
+  secret: z.string().min(16).max(64).optional(),
 });
+
+const RECENT_DELIVERIES_LIMIT = 50;
 
 const webhookIdParamSchema = z.object({
   id: z.string().regex(/^\d+$/, 'Invalid webhook ID').transform(Number),
 });
-
-// Helper function to hash secret using SHA-256
-function hashSecret(secret: string): string {
-  return crypto.createHash('sha256').update(secret).digest('hex');
-}
 
 // Helper function to generate a random secret
 function generateSecret(): string {
@@ -69,14 +67,13 @@ router.post(
 
       // Generate secret if not provided
       const webhookSecret = secret || generateSecret();
-      const secretHash = hashSecret(webhookSecret);
 
       // Create webhook subscription
       const webhook = await prisma.webhookSubscription.create({
         data: {
           url,
           events,
-          secretHash,
+          secret: webhookSecret,
           userId,
         },
       });
@@ -130,6 +127,53 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to list webhooks' });
   }
 });
+
+// GET /webhooks/:id/deliveries - Recent delivery attempts for a webhook
+router.get(
+  '/:id/deliveries',
+  authMiddleware,
+  validateRequest({ params: webhookIdParamSchema }),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      const walletAddress = req.user?.walletAddress;
+      if (!walletAddress) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const userId = await getUserIdFromWallet(walletAddress);
+      const webhook = await prisma.webhookSubscription.findUnique({
+        where: { id },
+        select: { userId: true },
+      });
+      // 404 (not 403) for foreign webhooks so IDs can't be probed.
+      if (!webhook || webhook.userId !== userId) {
+        return res.status(404).json({ error: 'Webhook not found' });
+      }
+
+      const deliveries = await prisma.webhookDelivery.findMany({
+        where: { subscriptionId: id },
+        orderBy: { createdAt: 'desc' },
+        take: RECENT_DELIVERIES_LIMIT,
+        select: {
+          id: true,
+          event: true,
+          tradeId: true,
+          attempt: true,
+          statusCode: true,
+          success: true,
+          error: true,
+          createdAt: true,
+        },
+      });
+
+      res.status(200).json({ deliveries });
+    } catch (error) {
+      appLogger.error({ err: error }, 'Error listing webhook deliveries');
+      res.status(500).json({ error: 'Failed to list webhook deliveries' });
+    }
+  }
+);
 
 // DELETE /webhooks/:id - Delete a webhook by ID
 router.delete(

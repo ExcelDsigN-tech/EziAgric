@@ -13,7 +13,8 @@ export type TradeWebhookEvent =
 const TRADE_EVENT_BY_STATUS: Partial<Record<TradeStatus, TradeWebhookEvent>> = {
   [TradeStatus.FUNDED]: "trade.funded",
   [TradeStatus.DELIVERED]: "trade.delivered",
-  [TradeStatus.SETTLED]: "trade.settled",
+  // The escrow has no SETTLED status: funds release moves a trade to COMPLETED.
+  [TradeStatus.COMPLETED]: "trade.settled",
   [TradeStatus.DISPUTED]: "trade.disputed",
 };
 
@@ -65,13 +66,13 @@ export class WebhookService {
       select: {
         id: true,
         url: true,
-        secretHash: true,
+        secret: true,
       },
     });
 
     const deliveryTargets: DeliveryTarget[] = activeSubscriptions.map((subscription) => ({
       url: subscription.url,
-      secret: subscription.secretHash,
+      secret: subscription.secret,
       subscriptionId: subscription.id,
     }));
 
@@ -98,7 +99,7 @@ export class WebhookService {
     const body = JSON.stringify(payload);
 
     await Promise.allSettled(
-      deliveryTargets.map((target) => this.sendWebhookWithRetry(target, body, tradeId, status)),
+      deliveryTargets.map((target) => this.sendWebhookWithRetry(target, body, tradeId, status, event)),
     );
   }
 
@@ -107,6 +108,7 @@ export class WebhookService {
     body: string,
     tradeId: string,
     status: TradeStatus,
+    event: string,
   ): Promise<void> {
     let lastError: unknown = null;
 
@@ -131,6 +133,8 @@ export class WebhookService {
           body,
         });
 
+        await this.recordDelivery(target, event, tradeId, attempt, response.status, response.ok, null);
+
         if (response.ok) {
           appLogger.debug(
             {
@@ -145,7 +149,6 @@ export class WebhookService {
           return;
         }
 
-        const shouldRetry = response.status >= 500 || response.status === 429;
         appLogger.warn(
           {
             tradeId,
@@ -154,16 +157,16 @@ export class WebhookService {
             subscriptionId: target.subscriptionId,
             statusCode: response.status,
             attempt,
-            shouldRetry,
           },
           "Webhook delivery returned non-OK status",
         );
-
-        if (!shouldRetry || attempt === this.maxAttempts) {
-          return;
-        }
+        lastError = new Error(`HTTP ${response.status}`);
       } catch (error) {
         lastError = error;
+        await this.recordDelivery(
+          target, event, tradeId, attempt, null, false,
+          error instanceof Error ? error.message : String(error),
+        );
         appLogger.warn(
           {
             tradeId,
@@ -179,7 +182,7 @@ export class WebhookService {
 
       if (attempt < this.maxAttempts) {
         const delay = Math.min(this.retryBaseMs * 2 ** (attempt - 1), this.retryMaxMs);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await this.sleep(delay);
       }
     }
 
@@ -195,13 +198,37 @@ export class WebhookService {
     );
   }
 
+  /** Persist one attempt for subscription targets; never fails delivery. */
+  private async recordDelivery(
+    target: DeliveryTarget,
+    event: string,
+    tradeId: string,
+    attempt: number,
+    statusCode: number | null,
+    success: boolean,
+    error: string | null,
+  ): Promise<void> {
+    if (!target.subscriptionId) return;
+    try {
+      await prisma.webhookDelivery.create({
+        data: { subscriptionId: target.subscriptionId, event, tradeId, attempt, statusCode, success, error },
+      });
+    } catch (err) {
+      appLogger.warn({ err, subscriptionId: target.subscriptionId }, "Failed to record webhook delivery");
+    }
+  }
+
+  protected sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   /**
    * Sign a webhook payload with the per-subscription secret. The signed
    * message is `${timestamp}.${body}` so receivers can reject replays by
    * checking the timestamp, and the signature is sent as
    * `X-Webhook-Signature` alongside `X-Webhook-Timestamp`.
    */
-  private signPayload(secret: string, timestamp: string, body: string): string {
+  signPayload(secret: string, timestamp: string, body: string): string {
     return crypto
       .createHmac("sha256", secret)
       .update(`${timestamp}.${body}`)

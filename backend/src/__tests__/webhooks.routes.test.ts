@@ -43,7 +43,7 @@ describe("Webhooks Routes", () => {
         id: 1,
         url: "https://example.com/webhook",
         events: ["trade.created", "trade.completed"],
-        secretHash: "hashedsecret123",
+        secret: "hashedsecret123",
         isActive: true,
         userId: mockUserId,
         createdAt: new Date(),

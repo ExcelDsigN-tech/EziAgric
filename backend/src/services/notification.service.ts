@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { sendSms } from '../lib/sms';
+import { sendSms } from './smsService';
 import { sendEmail } from '../lib/email';
 
 /**
