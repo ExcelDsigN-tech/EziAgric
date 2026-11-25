@@ -215,8 +215,8 @@ export default function MarketplaceScreen({ navigation }: Props) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Marketplace</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')} testID="open-create-listing">
-            <Text style={styles.link}>+ Sell</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')} testID="create-listing-btn">
+            <Text style={styles.link}>+ List</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setSheetOpen(true)} testID="open-filters">
             <Text style={styles.link}>Filters{activeCount > 0 ? ` (${activeCount})` : ''}</Text>
@@ -225,80 +225,133 @@ export default function MarketplaceScreen({ navigation }: Props) {
       </View>
 
       <TextInput
-        style={[styles.input, styles.search]}
-        placeholder="Search listings"
+        style={styles.search}
+        placeholder="Search listings…"
         value={search}
         onChangeText={setSearch}
-        returnKeyType="search"
         testID="marketplace-search"
       />
 
-      {error && listings.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.error}>{error}</Text>
-          <TouchableOpacity onPress={refresh} testID="marketplace-retry">
-            <Text style={styles.link}>Try again</Text>
-          </TouchableOpacity>
-        </View>
-      ) : isLoading ? (
-        <ActivityIndicator style={styles.center} color="#2d6a2d" testID="marketplace-loading" />
+      {isLoading ? (
+        <ActivityIndicator style={styles.loader} size="large" testID="marketplace-loading" />
       ) : (
         <FlatList
-          testID="marketplace-list"
           data={listings}
-          keyExtractor={(l) => l.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <ListingCard listing={item} onPress={() => openListing(item)} />}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={refresh}
+              testID="marketplace-refresh"
+            />
+          }
           onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={<Text style={styles.empty}>No listings match your filters.</Text>}
-          ListFooterComponent={isLoadingMore ? <ActivityIndicator color="#2d6a2d" testID="marketplace-loading-more" /> : null}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            isLoadingMore ? <ActivityIndicator style={styles.loader} testID="marketplace-loading-more" /> : null
+          }
+          ListEmptyComponent={
+            error ? (
+              <Text style={styles.error}>{error}</Text>
+            ) : (
+              <Text style={styles.empty}>No listings match your filters.</Text>
+            )
+          }
         />
       )}
 
       <FiltersSheet
         visible={sheetOpen}
         filters={filters}
-        onClose={() => setSheetOpen(false)}
         onApply={(next) => {
           setFilters(next);
           setSheetOpen(false);
         }}
+        onClose={() => setSheetOpen(false)}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f9f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+  container: { flex: 1, backgroundColor: '#fff' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: { fontSize: 18, fontWeight: '600' },
   headerActions: { flexDirection: 'row', gap: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a3a1a' },
-  link: { color: '#2d6a2d', fontWeight: '600' },
-  search: { marginHorizontal: 16, marginBottom: 8 },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d0dcd0', borderRadius: 8, padding: 10 },
-  listContent: { padding: 16, paddingTop: 8 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
+  link: { color: '#2563eb', fontSize: 14 },
+  search: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+  },
+  listContent: { paddingHorizontal: 16, paddingBottom: 24 },
+  card: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  commodity: { fontSize: 16, fontWeight: '700', color: '#1a3a1a' },
-  price: { fontSize: 14, fontWeight: '600', color: '#2d6a2d' },
-  meta: { marginTop: 6, color: '#667' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { textAlign: 'center', color: '#667', marginTop: 40 },
-  error: { color: '#EF4444', marginVertical: 8 },
-  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
-  sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  label: { fontWeight: '600', marginTop: 12, marginBottom: 6 },
+  commodity: { fontSize: 16, fontWeight: '600' },
+  price: { fontSize: 14, color: '#111827' },
+  meta: { fontSize: 13, color: '#6b7280', marginTop: 4 },
+  loader: { marginTop: 24 },
+  empty: { textAlign: 'center', color: '#6b7280', marginTop: 32 },
+  error: { color: '#dc2626', marginTop: 8 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '80%',
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
+  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 6 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#e0e8e0' },
-  chipActive: { backgroundColor: '#2d6a2d' },
-  chipText: { color: '#333' },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  chipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
+  chipText: { fontSize: 13, color: '#374151' },
   chipTextActive: { color: '#fff' },
-  priceInput: { flex: 1, marginRight: 8 },
-  sheetActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
-  applyBtn: { backgroundColor: '#2d6a2d', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  applyBtnDisabled: { opacity: 0.4 },
-  applyText: { color: '#fff', fontWeight: '700' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flex: 1,
+  },
+  priceInput: { marginRight: 8 },
+  sheetActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 16,
+    marginTop: 16,
+  },
+  applyBtn: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  applyBtnDisabled: { opacity: 0.5 },
+  applyText: { color: '#fff', fontWeight: '600' },
 });
