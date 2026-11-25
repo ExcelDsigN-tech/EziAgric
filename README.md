@@ -83,10 +83,26 @@ Setup failing? See [Troubleshooting local setup](docs/troubleshooting-local-setu
 
 ### Mobile setup
 
+The mobile app (`mobile/`) is a React Native Expo application providing the wallet, notification, and trade UX for buyers and sellers on iOS and Android.
+
+**Key responsibilities:**
+- Passkey-based onboarding and wallet creation (via the email-auth flow in `backend/`)
+- Real-time push notifications for trade state changes (deposit, confirm, dispute, release)
+- In-app trade flow: initiate → deposit → confirm → dispute/release
+
+**Environment variables** (see `mobile/.env.example`):
+| Variable | Description |
+|---|---|
+| `EXPO_PUBLIC_API_URL` | Backend base URL |
+| `EXPO_PUBLIC_WS_URL` | WebSocket endpoint for real-time updates |
+
+**Local dev:**
 1. `cd mobile`
 2. `cp .env.example .env.local`
 3. `npm install`
 4. `npm start`
+
+The Expo dev server starts on port 8081. Use Expo Go or a simulator to preview on device. CI runs `npm run type-check` and `npm run lint` on every PR (see "Mobile Required Gate" in the CI matrix).
 
 ### Backend API docs
 
