@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { rateLimit } from './middleware/rateLimit';
-import { requestLogger } from './middleware/requestLogger';
+import { requestLogger, logError } from './middleware/requestLogger';
 import { idempotency } from './middleware/idempotency';
 import healthRouter from './routes/health';
 import tradesRouter from './routes/trades';
@@ -38,5 +38,14 @@ const evidenceLimiter = rateLimit({
 
 app.use('/trades', tradesLimiter, idempotency, tradesRouter);
 app.use('/evidence', evidenceLimiter, evidenceRouter);
+
+// Structured error logging with stack trace and userId when available.
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logError(err, req as express.Request & { requestId?: string; user?: { id?: string } });
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ error: 'Internal Server Error' });
+});
 
 export default app;
