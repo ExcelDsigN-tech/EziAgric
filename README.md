@@ -400,3 +400,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 - #364: [Contract] Reject self-trades where buyer == seller
 <!-- handsoff-issue-426 -->
 - #426: [Frontend] Price reference widget on listing form
+
+<!-- handsoff-issue-912 -->
+- #912: [Contracts] Add get_trade_count view function
