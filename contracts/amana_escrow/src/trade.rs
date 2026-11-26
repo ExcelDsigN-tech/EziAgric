@@ -659,7 +659,9 @@ impl EscrowContract {
         }
     }
 
-    /// Confirms delivery of goods, transitioning the trade from `Funded` to `Delivered`.
+    /// Confirms delivery of goods, transitioning the trade from `Funded` to
+    /// `Delivered` and recording `delivered_at` on both the trade and the
+    /// release sequence.
     ///
     /// **Caller:** buyer only — `trade.buyer.require_auth()` is enforced.
     ///
