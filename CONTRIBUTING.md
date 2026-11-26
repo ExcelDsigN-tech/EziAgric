@@ -129,8 +129,21 @@ Write-path load tests live under `k6/` and use [k6](https://k6.io). Each scenari
 | `k6/confirm.js` | `POST /api/v1/trades/:id/confirm` |
 | `k6/dispute.js` | `POST /api/v1/trades/:id/dispute` |
 
-Run locally: `k6 run k6/<scenario>.js` with `K6_API_URL` pointing at a staging instance.
-Add a new scenario when introducing a new write endpoint that is expected to receive high traffic.
+**Environment variables:**
+
+| Variable | Description |
+|---|---|
+| `K6_API_URL` | Base URL of the target API, e.g. `https://staging.eziagric.app` |
+| `K6_AUTH_TOKEN` | Bearer token for an authenticated test user |
+| `K6_VUS` | Number of virtual users (default: 10) |
+| `K6_DURATION` | Test duration, e.g. `30s` (default: `30s`) |
+
+Run locally:
+```sh
+K6_API_URL=http://localhost:4000 K6_AUTH_TOKEN=<token> k6 run k6/deposit.js
+```
+
+Add a new scenario file when introducing a new write endpoint expected to receive high traffic.
 See #690 for the initial k6 coverage milestone.
 
 ## Where do implementation and PR notes go?
