@@ -244,6 +244,11 @@ jobs:
             echo "::error::STAGING_BASE_URL secret is not configured"; exit 1
           fi
           k6 run k6/load-test.js
+          # Write-path scenarios (deposit → confirm → dispute) — tracked in #690.
+          # Runs only when the scenario files exist so the job doesn't break before they're added.
+          for scenario in k6/deposit.js k6/confirm.js k6/dispute.js; do
+            [ -f "$scenario" ] && k6 run "$scenario" || echo "skip: $scenario not yet present (#690)"
+          done
 
       - name: Fetch trend history
         run: |
