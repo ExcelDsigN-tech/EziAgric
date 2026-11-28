@@ -1,56 +1,68 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useTranslation, loadLanguage, type Language } from '../i18n';
-
-const LANGUAGES: { code: Language; labelKey: 'english' | 'hausa' }[] = [
-  { code: 'en', labelKey: 'english' },
-  { code: 'ha', labelKey: 'hausa' },
-];
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES, type LanguageCode } from '../i18n';
+import { ONBOARDING_COMPLETED_KEY } from './OnboardingScreen';
 
 export default function SettingsScreen() {
-  const { t, language, setLanguage } = useTranslation();
+  const navigation = useNavigation<any>();
+  const { t, i18n } = useTranslation();
 
-  useEffect(() => {
-    loadLanguage();
-  }, []);
+  const replayOnboarding = async () => {
+    try {
+      await AsyncStorage.removeItem(ONBOARDING_COMPLETED_KEY);
+    } catch (e) {
+      // Non-fatal: still navigate so the demo can proceed.
+    }
+    navigation.navigate('Onboarding');
+  };
+
+  const changeLanguage = (code: LanguageCode) => {
+    i18n.changeLanguage(code);
+  };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>{t('settings')}</Text>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('language')}</Text>
         <View style={styles.languageRow}>
-          {LANGUAGES.map(({ code, labelKey }) => {
-            const selected = language === code;
+          {SUPPORTED_LANGUAGES.map(({ code, label }) => {
+            const selected = i18n.language === code;
             return (
               <TouchableOpacity
                 key={code}
                 style={[styles.languageButton, selected && styles.languageButtonSelected]}
-                onPress={() => setLanguage(code)}
+                onPress={() => changeLanguage(code)}
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
               >
                 <Text
                   style={[styles.languageLabel, selected && styles.languageLabelSelected]}
                 >
-                  {t(labelKey)}
+                  {label}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </View>
-    </View>
+
+      <Text style={styles.sectionTitle}>General</Text>
+      <TouchableOpacity style={styles.row} onPress={replayOnboarding}>
+        <Text style={styles.rowLabel}>Replay onboarding</Text>
+        <Text style={styles.rowChevron}>›</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  content: { padding: 16 },
   title: {
     fontSize: 24,
     fontWeight: '700',
@@ -88,4 +100,15 @@ const styles = StyleSheet.create({
     color: '#16a34a',
     fontWeight: '600',
   },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  rowLabel: { fontSize: 16, color: '#1a1a1a' },
+  rowChevron: { fontSize: 20, color: '#bbbbbb' },
 });

@@ -1,37 +1,46 @@
 import { Router, Request, Response } from 'express';
-import { idempotency, recordIdempotencyKey } from '../middleware/idempotency';
-import { rateLimit } from '../middleware/rateLimit';
+import { body, validationResult } from 'express-validator';
+import { authenticate } from '../middleware/auth';
+import { Trade } from '../models/Trade';
+import { buildPriceWarning } from '../services/priceFeedService';
 
 const router = Router();
 
-const tradesLimiter = rateLimit({
-  limit: 10,
-  windowMs: 60_000,
-  keyPrefix: 'trades',
-  keyGenerator: (req: Request) => {
-    const user = (req as Request & { user?: { id?: string | number } }).user;
-    return user?.id !== undefined ? String(user.id) : undefined;
-  },
-});
-
-router.post('/trades', tradesLimiter, idempotency, async (req: Request, res: Response) => {
-  try {
-    const trade = await createTrade(req.body);
-
-    const idempotencyKey = res.locals.idempotencyKey as string | undefined;
-    if (idempotencyKey) {
-      recordIdempotencyKey(idempotencyKey, String(trade.id));
+// Create a new trade
+router.post(
+  '/',
+  authenticate,
+  [
+    body('commodity').isString().notEmpty(),
+    body('quantity').isNumeric().isFloat({ gt: 0 }),
+    body('price').isNumeric().isFloat({ gt: 0 }),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
 
-    res.status(201).json(trade);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create trade' });
-  }
-});
+    try {
+      const { commodity, quantity, price } = req.body;
+      const perUnitPrice = Number(price) / Number(quantity);
 
-async function createTrade(payload: unknown): Promise<{ id: string | number }> {
-  // Existing trade creation logic lives here.
-  throw new Error('createTrade not implemented');
-}
+      const trade = await Trade.create({
+        ...req.body,
+        userId: (req as any).user?.id,
+      });
+
+      // Informational only — never blocks trade creation.
+      const priceWarning = await buildPriceWarning(commodity, perUnitPrice);
+
+      return res.status(201).json({
+        trade,
+        ...(priceWarning ? { priceWarning } : {}),
+      });
+    } catch (error) {
+      return res.status(500).json({ message: 'Failed to create trade' });
+    }
+  }
+);
 
 export default router;
