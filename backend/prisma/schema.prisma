@@ -378,6 +378,8 @@ model RefreshToken {
   jti       String   @unique @db.VarChar(255)
   userId    Int
   expiresAt DateTime
+  /// Set when the token is rotated; presenting a used token again signals theft.
+  usedAt    DateTime?
   createdAt DateTime @default(now())
 
   // Relations
