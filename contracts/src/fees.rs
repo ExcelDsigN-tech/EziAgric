@@ -1,113 +1,154 @@
-//! Platform fee calculation and distribution.
-//!
-//! Fees are expressed in **basis points** (bps), where `1 bps = 0.01%` and
-//! `10_000 bps = 100%`. The platform fee charged on a trade is computed as:
-//!
-//! ```text
-//! fee = amount * fee_bps / 10_000
-//! ```
-//!
-//! Integer arithmetic is used throughout, so the result is **truncated toward
-//! zero** (floor for non-negative amounts). Any fractional remainder below one
-//! stroop is not charged. For example, with `amount = 1_000` and
-//! `fee_bps = 250` (2.5%):
-//!
-//! ```text
-//! fee = 1_000 * 250 / 10_000 = 250_000 / 10_000 = 25
-//! ```
-//!
-//! The seller receives `amount - fee` and the fee is credited to the platform
-//! fee collector. Callers should be aware that very small amounts combined with
-//! small `fee_bps` values can round down to a zero fee.
+use soroban_sdk::{contracttype, Address, Env, Map};
 
-use soroban_sdk::{contracttype, Address, Env};
+use crate::admin;
+use crate::errors::ContractError;
 
-/// Storage keys for fee configuration.
+/// Storage keys for the fee module.
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub enum FeeKey {
-    PlatformFeeBps,
+    /// Global fallback fee recipient address.
     FeeAddress,
-    TotalFeesCollected,
+    /// Per-token fee recipient overrides: token -> recipient.
+    TokenFeeAddress(Address),
 }
 
-/// Default platform fee in basis points (0 = no fee).
-pub const DEFAULT_PLATFORM_FEE_BPS: u32 = 0;
-
-/// Read the configured platform fee in basis points.
-///
-/// The value is read from persistent contract storage and is expected to be in
-/// the range `0..=10_000` (0% to 100%).
-pub fn get_platform_fee_bps(env: &Env) -> u32 {
-    env.storage()
-        .instance()
-        .get(&FeeKey::PlatformFeeBps)
-        .unwrap_or(DEFAULT_PLATFORM_FEE_BPS)
-}
-
-/// Persist the platform fee in basis points.
-pub fn set_platform_fee_bps(env: &Env, bps: u32) {
-    env.storage()
-        .instance()
-        .set(&FeeKey::PlatformFeeBps, &bps);
-}
-
-/// Read the configured fee recipient address, if any.
-pub fn get_fee_address(env: &Env) -> Option<Address> {
+/// Returns the global fallback fee recipient address, if configured.
+pub fn get_global_fee_address(env: &Env) -> Option<Address> {
     env.storage().instance().get(&FeeKey::FeeAddress)
 }
 
-/// Persist the fee recipient address.
-pub fn set_fee_address(env: &Env, address: &Address) {
+/// Sets the global fallback fee recipient address.
+pub fn set_global_fee_address(env: &Env, recipient: Address) {
     env.storage()
         .instance()
-        .set(&FeeKey::FeeAddress, address);
+        .set(&FeeKey::FeeAddress, &recipient);
 }
 
-/// Read the cumulative total of fees collected across all settlements.
-pub fn get_total_fees(env: &Env) -> i128 {
+/// Returns the fee recipient configured for a specific token, if any.
+pub fn get_token_fee_address(env: &Env, token: &Address) -> Option<Address> {
     env.storage()
         .instance()
-        .get(&FeeKey::TotalFeesCollected)
-        .unwrap_or(0)
+        .get(&FeeKey::TokenFeeAddress(token.clone()))
 }
 
-/// Add `amount` to the cumulative fee counter.
-pub fn add_total_fees(env: &Env, amount: i128) {
-    let total = get_total_fees(env) + amount;
+/// Sets the fee recipient for a specific token.
+///
+/// Requires `admin` authorization and that `admin` matches the stored admin.
+pub fn set_fee_address(
+    env: &Env,
+    token: Address,
+    recipient: Address,
+    admin: Address,
+) -> Result<(), ContractError> {
+    admin::require_admin(env, &admin)?;
     env.storage()
         .instance()
-        .set(&FeeKey::TotalFeesCollected, &total);
+        .set(&FeeKey::TokenFeeAddress(token), &recipient);
+    Ok(())
 }
 
-/// Computes the platform fee owed on `amount` at the given `fee_bps`.
+/// Read-only entrypoint: returns the fee recipient for `token`.
 ///
-/// Uses the formula `amount * fee_bps / 10_000` with integer arithmetic, so the
-/// result is truncated toward zero. See the module-level docs for a worked
-/// example.
-///
-/// # Overflow
-///
-/// `amount * fee_bps` is evaluated in `i128`; callers must ensure the product
-/// fits within `i128` to avoid a panic.
-pub fn calculate_fee(amount: i128, fee_bps: u32) -> i128 {
-    amount * fee_bps as i128 / 10_000
+/// Falls back to the global fee address when no per-token address is set.
+/// Panics if neither is configured.
+pub fn get_fee_address(env: &Env, token: Address) -> Address {
+    get_token_fee_address(env, &token)
+        .or_else(|| get_global_fee_address(env))
+        .expect("fee address not configured")
 }
 
-/// Computes the platform fee for `amount` using the fee rate stored on-chain.
+/// Resolves the fee recipient to use when settling fees for `token`.
 ///
-/// Reads the configured fee via [`get_platform_fee_bps`] and delegates to
-/// [`calculate_fee`], so the same truncation and overflow behaviour applies.
-pub fn calculate_platform_fee(env: &Env, amount: i128) -> i128 {
-    calculate_fee(amount, get_platform_fee_bps(env))
+/// Prefers the per-token address, falling back to the global address.
+pub fn resolve_fee_address(env: &Env, token: &Address) -> Result<Address, ContractError> {
+    get_token_fee_address(env, token)
+        .or_else(|| get_global_fee_address(env))
+        .ok_or(ContractError::FeeAddressNotSet)
 }
 
-/// Splits `amount` into the seller payout and the platform fee.
+/// Settles fees for `token` by routing `amount` to the resolved fee recipient.
 ///
-/// The fee is computed with [`calculate_platform_fee`] and subtracted from the
-/// gross amount; the remainder is returned as the seller payout. Because the
-/// fee is truncated, `seller_amount + fee == amount` always holds.
-pub fn split_fee(env: &Env, amount: i128) -> (i128, i128) {
-    let fee = calculate_platform_fee(env, amount);
-    (amount - fee, fee)
+/// Uses the per-token fee address when configured, otherwise the global
+/// fallback address.
+pub fn settle_fee(
+    env: &Env,
+    token: &Address,
+    payer: &Address,
+    amount: i128,
+) -> Result<(), ContractError> {
+    let recipient = resolve_fee_address(env, token)?;
+    let client = soroban_sdk::token::Client::new(env, token);
+    client.transfer(payer, &recipient, &amount);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::Env;
+
+    fn setup() -> (Env, Address) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        admin::set_admin(&env, &admin);
+        (env, admin)
+    }
+
+    #[test]
+    fn single_token_configuration() {
+        let (env, admin) = setup();
+        let token = Address::generate(&env);
+        let recipient = Address::generate(&env);
+
+        set_fee_address(&env, token.clone(), recipient.clone(), admin).unwrap();
+
+        assert_eq!(get_fee_address(&env, token.clone()), recipient);
+        assert_eq!(resolve_fee_address(&env, &token).unwrap(), recipient);
+    }
+
+    #[test]
+    fn multi_token_configuration() {
+        let (env, admin) = setup();
+        let cngn = Address::generate(&env);
+        let cusdc = Address::generate(&env);
+        let cngn_recipient = Address::generate(&env);
+        let cusdc_recipient = Address::generate(&env);
+
+        set_fee_address(&env, cngn.clone(), cngn_recipient.clone(), admin.clone()).unwrap();
+        set_fee_address(&env, cusdc.clone(), cusdc_recipient.clone(), admin).unwrap();
+
+        assert_eq!(get_fee_address(&env, cngn.clone()), cngn_recipient);
+        assert_eq!(get_fee_address(&env, cusdc.clone()), cusdc_recipient);
+        assert_eq!(resolve_fee_address(&env, &cngn).unwrap(), cngn_recipient);
+        assert_eq!(resolve_fee_address(&env, &cusdc).unwrap(), cusdc_recipient);
+    }
+
+    #[test]
+    fn falls_back_to_global_address() {
+        let (env, _admin) = setup();
+        let token = Address::generate(&env);
+        let global = Address::generate(&env);
+
+        set_global_fee_address(&env, global.clone());
+
+        assert_eq!(get_fee_address(&env, token.clone()), global);
+        assert_eq!(resolve_fee_address(&env, &token).unwrap(), global);
+    }
+
+    #[test]
+    fn per_token_overrides_global() {
+        let (env, admin) = setup();
+        let token = Address::generate(&env);
+        let global = Address::generate(&env);
+        let per_token = Address::generate(&env);
+
+        set_global_fee_address(&env, global);
+        set_fee_address(&env, token.clone(), per_token.clone(), admin).unwrap();
+
+        assert_eq!(get_fee_address(&env, token.clone()), per_token);
+        assert_eq!(resolve_fee_address(&env, &token).unwrap(), per_token);
+    }
 }

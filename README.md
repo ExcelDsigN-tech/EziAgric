@@ -418,6 +418,12 @@ Distributed under the MIT License. See `LICENSE` for more information.
 <!-- handsoff-issue-426 -->
 - #426: [Frontend] Price reference widget on listing form
 
+<!-- handsoff-issue-924 -->
+- #924: [Contracts] Add list_disputes view returning open dispute IDs
+
+<!-- handsoff-issue-926 -->
+- #926: [Contracts] Add partial delivery tests for split escrow release
+
 <!-- handsoff-issue-912 -->
 - #912: [Contracts] Add get_trade_count view function
 
