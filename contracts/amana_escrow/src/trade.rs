@@ -659,6 +659,15 @@ impl EscrowContract {
         }
     }
 
+    /// Confirms delivery of goods, transitioning the trade from `Funded` to
+    /// `Delivered` and recording `delivered_at` on both the trade and the
+    /// release sequence.
+    ///
+    /// **Caller:** buyer only — `trade.buyer.require_auth()` is enforced.
+    ///
+    /// **Precondition:** trade status must be `Funded`; panics otherwise.
+    ///
+    /// **Emits:** [`DeliveryConfirmedEvent`] with `trade_id` and `delivered_at` timestamp.
     pub fn confirm_delivery(env: Env, trade_id: u64) {
         let key = DataKey::Trade(trade_id);
         let mut trade: Trade = Self::load_trade(&env, &key);
