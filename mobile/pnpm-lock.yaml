@@ -50,6 +50,9 @@ importers:
       expo-image-picker:
         specifier: ~58.0.10
         version: 58.0.10(expo@58.0.10)
+      expo-local-authentication:
+        specifier: ~58.0.3
+        version: 58.0.3(expo@58.0.10)
       expo-localization:
         specifier: ~57.0.2
         version: 57.0.2(expo@58.0.10)(react@18.3.1)
@@ -2331,6 +2334,11 @@ packages:
     peerDependencies:
       expo: '*'
       react: '*'
+
+  expo-local-authentication@58.0.3:
+    resolution: {integrity: sha512-noeEnLGIjzawKsNF1mdzx6hUTihaD89AsiWdZGhZFfktwFU9P0dCEn9ed3D3E8WmEGNoejWnNUfImEB3HwIznQ==}
+    peerDependencies:
+      expo: '*'
 
   expo-localization@57.0.2:
     resolution: {integrity: sha512-sIKYH3Ivddoge568WY6j+Kp2MAAZzWWqEnY2bokLkJFwX366tGL1mEnoY2WUi/qHatFFPop2yqDdurzbhnnimQ==}
@@ -7683,6 +7691,11 @@ snapshots:
     dependencies:
       expo: 58.0.10(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(react-native@0.87.1(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)(typescript@6.0.3)
       react: 18.3.1
+
+  expo-local-authentication@58.0.3(expo@58.0.10):
+    dependencies:
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(react-native@0.87.1(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)(typescript@6.0.3)
+      invariant: 2.2.4
 
   expo-localization@57.0.2(expo@58.0.10)(react@18.3.1):
     dependencies:
