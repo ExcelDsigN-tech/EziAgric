@@ -41,5 +41,7 @@ jobs:
           for s in frontend backend mobile; do (cd $s && npm install --no-audit --no-fund --ignore-scripts); done
           cp backend/.env.example backend/.env
           cp frontend/.env.example frontend/.env.local
+          # Copy tracing env file; dev-doctor validates its presence separately from .env
+          cp backend/.env.tracing.example backend/.env.tracing 2>/dev/null || true
       - name: Run doctor
         run: bash scripts/dev-doctor.sh --no-smoke
