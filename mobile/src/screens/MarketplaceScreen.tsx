@@ -12,6 +12,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../types/navigation';
 import type { Listing, ListingFilters } from '../types/listing';
@@ -21,6 +22,8 @@ import EmptyState from '../components/EmptyState';
 
 type Props = StackScreenProps<RootStackParamList, 'Marketplace'>;
 
+const FILTERS_STORAGE_KEY = 'marketplace.filters';
+
 /** Number of filters that narrow the result set (search text excluded). */
 export function countActiveFilters(filters: ListingFilters): number {
   return [
@@ -28,10 +31,12 @@ export function countActiveFilters(filters: ListingFilters): number {
     filters.region,
     filters.minPrice !== undefined ? 1 : undefined,
     filters.maxPrice !== undefined ? 1 : undefined,
+    filters.minQuantity !== undefined ? 1 : undefined,
+    filters.maxQuantity !== undefined ? 1 : undefined,
   ].filter(Boolean).length;
 }
 
-function parsePrice(text: string): number | undefined {
+function parseAmount(text: string): number | undefined {
   const n = parseFloat(text);
   return text.trim() !== '' && !isNaN(n) && n >= 0 ? n : undefined;
 }
@@ -69,6 +74,8 @@ function FiltersSheet({
   const [draft, setDraft] = useState<ListingFilters>(filters);
   const [minText, setMinText] = useState('');
   const [maxText, setMaxText] = useState('');
+  const [minQtyText, setMinQtyText] = useState('');
+  const [maxQtyText, setMaxQtyText] = useState('');
   const [commodities, setCommodities] = useState<ReferenceItem[]>(FALLBACK_COMMODITIES);
   const [regions, setRegions] = useState<ReferenceItem[]>([]);
 
@@ -78,6 +85,8 @@ function FiltersSheet({
       setDraft(filters);
       setMinText(filters.minPrice !== undefined ? String(filters.minPrice) : '');
       setMaxText(filters.maxPrice !== undefined ? String(filters.maxPrice) : '');
+      setMinQtyText(filters.minQuantity !== undefined ? String(filters.minQuantity) : '');
+      setMaxQtyText(filters.maxQuantity !== undefined ? String(filters.maxQuantity) : '');
     }
   }, [visible, filters]);
 
@@ -90,9 +99,13 @@ function FiltersSheet({
     };
   }, []);
 
-  const min = parsePrice(minText);
-  const max = parsePrice(maxText);
-  const rangeInvalid = min !== undefined && max !== undefined && min > max;
+  const min = parseAmount(minText);
+  const max = parseAmount(maxText);
+  const minQty = parseAmount(minQtyText);
+  const maxQty = parseAmount(maxQtyText);
+  const rangeInvalid =
+    (min !== undefined && max !== undefined && min > max) ||
+    (minQty !== undefined && maxQty !== undefined && minQty > maxQty);
 
   const toggle = (key: 'commodity' | 'region', code: string) =>
     setDraft((d) => ({ ...d, [key]: d[key] === code ? undefined : code }));
@@ -154,7 +167,26 @@ function FiltersSheet({
                 testID="filter-max-price"
               />
             </View>
-            {rangeInvalid && <Text style={styles.error}>Minimum price must not exceed maximum.</Text>}
+            <Text style={styles.label}>Quantity</Text>
+            <View style={styles.cardRow}>
+              <TextInput
+                style={[styles.input, styles.priceInput]}
+                placeholder="Min"
+                keyboardType="numeric"
+                value={minQtyText}
+                onChangeText={setMinQtyText}
+                testID="filter-min-quantity"
+              />
+              <TextInput
+                style={[styles.input, styles.priceInput]}
+                placeholder="Max"
+                keyboardType="numeric"
+                value={maxQtyText}
+                onChangeText={setMaxQtyText}
+                testID="filter-max-quantity"
+              />
+            </View>
+            {rangeInvalid && <Text style={styles.error}>Minimum must not exceed maximum.</Text>}
           </ScrollView>
 
           <View style={styles.sheetActions}>
@@ -163,6 +195,8 @@ function FiltersSheet({
                 setDraft({ q: filters.q });
                 setMinText('');
                 setMaxText('');
+                setMinQtyText('');
+                setMaxQtyText('');
               }}
               testID="filters-reset"
             >
@@ -174,7 +208,9 @@ function FiltersSheet({
             <TouchableOpacity
               style={[styles.applyBtn, rangeInvalid && styles.applyBtnDisabled]}
               disabled={rangeInvalid}
-              onPress={() => onApply({ ...draft, minPrice: min, maxPrice: max })}
+              onPress={() =>
+                onApply({ ...draft, minPrice: min, maxPrice: max, minQuantity: minQty, maxQuantity: maxQty })
+              }
               testID="filters-apply"
             >
               <Text style={styles.applyText}>Apply</Text>
@@ -200,6 +236,29 @@ export default function MarketplaceScreen({ navigation }: Props) {
     }, 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  // Restore saved filters on mount; saving waits until restore finishes so the empty
+  // initial state cannot overwrite them. Promise.resolve() turns a synchronous
+  // native-module throw into a handled rejection.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => AsyncStorage.getItem(FILTERS_STORAGE_KEY))
+      .then((raw) => {
+        if (raw) setFilters(JSON.parse(raw) ?? {});
+      })
+      .catch(() => {})
+      .finally(() => setHydrated(true));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    // Search text is transient, so only structured filters are persisted.
+    const saved = { ...filters, q: undefined };
+    Promise.resolve()
+      .then(() => AsyncStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(saved)))
+      .catch(() => {});
+  }, [filters, hydrated]);
 
   const openListing = useCallback(
     (listing: Listing) => navigation.navigate('ListingDetail', { listingId: listing.id }),
@@ -240,6 +299,29 @@ export default function MarketplaceScreen({ navigation }: Props) {
     );
   };
 
+  const removeFilters = (keys: (keyof ListingFilters)[]) =>
+    setFilters((f) => {
+      const next = { ...f };
+      for (const k of keys) delete next[k];
+      return next;
+    });
+
+  const chips: { id: string; label: string; keys: (keyof ListingFilters)[] }[] = [];
+  if (filters.commodity) chips.push({ id: 'commodity', label: `Commodity: ${filters.commodity}`, keys: ['commodity'] });
+  if (filters.region) chips.push({ id: 'region', label: `Region: ${filters.region}`, keys: ['region'] });
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined)
+    chips.push({
+      id: 'price',
+      label: `Price: ${filters.minPrice ?? 0}–${filters.maxPrice ?? '∞'}`,
+      keys: ['minPrice', 'maxPrice'],
+    });
+  if (filters.minQuantity !== undefined || filters.maxQuantity !== undefined)
+    chips.push({
+      id: 'quantity',
+      label: `Quantity: ${filters.minQuantity ?? 0}–${filters.maxQuantity ?? '∞'}`,
+      keys: ['minQuantity', 'maxQuantity'],
+    });
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -267,7 +349,22 @@ export default function MarketplaceScreen({ navigation }: Props) {
         />
       </View>
 
-      {error ? (
+      {chips.length > 0 && (
+        <View style={styles.chipBar}>
+          {chips.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={[styles.chip, styles.chipActive]}
+              onPress={() => removeFilters(c.keys)}
+              testID={`active-filter-${c.id}`}
+            >
+              <Text style={styles.chipTextActive}>{c.label} ✕</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {error && listings.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
           <TouchableOpacity onPress={refresh}>
@@ -325,6 +422,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 14,
   },
+  chipBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: 16, marginBottom: 8 },
   list: { paddingHorizontal: 16, paddingBottom: 24 },
   emptyList: { flexGrow: 1 },
   card: {
