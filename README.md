@@ -416,3 +416,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 - #364: [Contract] Reject self-trades where buyer == seller
 <!-- handsoff-issue-426 -->
 - #426: [Frontend] Price reference widget on listing form
+
+<!-- handsoff-issue-1002 -->
+- #1002: [Contracts] Add per-token minimum trade amount
