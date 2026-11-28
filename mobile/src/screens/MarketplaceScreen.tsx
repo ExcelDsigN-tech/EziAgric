@@ -18,6 +18,7 @@ import type { RootStackParamList } from '../types/navigation';
 import type { Listing, ListingFilters } from '../types/listing';
 import { useListings } from '../hooks/useListings';
 import { FALLBACK_COMMODITIES, referenceApi, type ReferenceItem } from '../api/reference';
+import EmptyState from '../components/EmptyState';
 
 type Props = StackScreenProps<RootStackParamList, 'Marketplace'>;
 
@@ -265,6 +266,38 @@ export default function MarketplaceScreen({ navigation }: Props) {
   );
 
   const activeCount = countActiveFilters(filters);
+  const hasQuery = !!filters.q || activeCount > 0;
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setFilters({});
+  }, []);
+
+  const renderEmpty = () => {
+    if (isLoading) return null;
+    if (hasQuery) {
+      return (
+        <EmptyState
+          illustration={<Text style={styles.emptyIllustration}>🔍</Text>}
+          heading="No listings yet"
+          message="No listings match your search or filters."
+          ctaLabel="Clear filters"
+          onCtaPress={clearFilters}
+          testID="empty-state-filtered"
+        />
+      );
+    }
+    return (
+      <EmptyState
+        illustration={<Text style={styles.emptyIllustration}>🌾</Text>}
+        heading="No listings yet"
+        message="Be the first to post a listing on the marketplace."
+        ctaLabel="Post listing"
+        onCtaPress={() => navigation.navigate('CreateListing')}
+        testID="empty-state-default"
+      />
+    );
+  };
 
   const removeFilters = (keys: (keyof ListingFilters)[]) =>
     setFilters((f) => {
@@ -297,23 +330,24 @@ export default function MarketplaceScreen({ navigation }: Props) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Marketplace</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')} testID="open-create-listing">
-            <Text style={styles.link}>+ Sell</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('CreateListing')} testID="header-post-listing">
+            <Text style={styles.link}>Post</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSheetOpen(true)} testID="open-filters">
+          <TouchableOpacity onPress={() => setSheetOpen(true)} testID="header-filters">
             <Text style={styles.link}>Filters{activeCount > 0 ? ` (${activeCount})` : ''}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <TextInput
-        style={[styles.input, styles.search]}
-        placeholder="Search listings"
-        value={search}
-        onChangeText={setSearch}
-        returnKeyType="search"
-        testID="marketplace-search"
-      />
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.input}
+          placeholder="Search listings"
+          value={search}
+          onChangeText={setSearch}
+          testID="marketplace-search"
+        />
+      </View>
 
       {chips.length > 0 && (
         <View style={styles.chipBar}>
@@ -333,70 +367,114 @@ export default function MarketplaceScreen({ navigation }: Props) {
       {error && listings.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
-          <TouchableOpacity onPress={refresh} testID="marketplace-retry">
-            <Text style={styles.link}>Try again</Text>
+          <TouchableOpacity onPress={refresh}>
+            <Text style={styles.link}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : isLoading ? (
-        <ActivityIndicator style={styles.center} color="#2d6a2d" testID="marketplace-loading" />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" />
+        </View>
       ) : (
         <FlatList
-          testID="marketplace-list"
           data={listings}
-          keyExtractor={(l) => l.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <ListingCard listing={item} onPress={() => openListing(item)} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={listings.length === 0 ? styles.emptyList : styles.list}
+          ListEmptyComponent={renderEmpty}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} />}
           onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={<Text style={styles.empty}>No listings match your filters.</Text>}
-          ListFooterComponent={isLoadingMore ? <ActivityIndicator color="#2d6a2d" testID="marketplace-loading-more" /> : null}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={isLoadingMore ? <ActivityIndicator style={styles.footer} /> : null}
         />
       )}
 
       <FiltersSheet
         visible={sheetOpen}
         filters={filters}
-        onClose={() => setSheetOpen(false)}
         onApply={(next) => {
           setFilters(next);
           setSheetOpen(false);
         }}
+        onClose={() => setSheetOpen(false)}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f9f5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#1F2937' },
   headerActions: { flexDirection: 'row', gap: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a3a1a' },
-  link: { color: '#2d6a2d', fontWeight: '600' },
-  search: { marginHorizontal: 16, marginBottom: 8 },
+  searchRow: { paddingHorizontal: 16, paddingBottom: 8 },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
   chipBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginHorizontal: 16, marginBottom: 8 },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d0dcd0', borderRadius: 8, padding: 10 },
-  listContent: { padding: 16, paddingTop: 8 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
+  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  emptyList: { flexGrow: 1 },
+  card: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  commodity: { fontSize: 16, fontWeight: '700', color: '#1a3a1a' },
-  price: { fontSize: 14, fontWeight: '600', color: '#2d6a2d' },
-  meta: { marginTop: 6, color: '#667' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { textAlign: 'center', color: '#667', marginTop: 40 },
-  error: { color: '#EF4444', marginVertical: 8 },
-  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
-  sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  label: { fontWeight: '600', marginTop: 12, marginBottom: 6 },
+  commodity: { fontSize: 16, fontWeight: '600', color: '#111827' },
+  price: { fontSize: 14, fontWeight: '600', color: '#16A34A' },
+  meta: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  footer: { marginVertical: 16 },
+  error: { color: '#DC2626', fontSize: 13, marginTop: 8 },
+  link: { color: '#16A34A', fontSize: 14, fontWeight: '600' },
+  emptyIllustration: { fontSize: 48 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    maxHeight: '85%',
+  },
+  sheetTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12, color: '#1F2937' },
+  sheetActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginTop: 12, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#e0e8e0' },
-  chipActive: { backgroundColor: '#2d6a2d' },
-  chipText: { color: '#333' },
-  chipTextActive: { color: '#fff' },
+  chip: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  chipActive: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  chipText: { fontSize: 13, color: '#374151' },
+  chipTextActive: { color: '#FFFFFF' },
   priceInput: { flex: 1, marginRight: 8 },
-  sheetActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
-  applyBtn: { backgroundColor: '#2d6a2d', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  applyBtnDisabled: { opacity: 0.4 },
-  applyText: { color: '#fff', fontWeight: '700' },
+  applyBtn: {
+    backgroundColor: '#16A34A',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  applyBtnDisabled: { opacity: 0.5 },
+  applyText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
 });
