@@ -215,6 +215,10 @@ const messages = {
     ig: "Igbo",
     pcm: "Pidgin",
   },
+  theme: {
+    switchToLight: "Switch to light mode",
+    switchToDark: "Switch to dark mode",
+  },
 } as const;
 
 export default messages;
