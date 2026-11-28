@@ -331,6 +331,7 @@ Key architectural decisions are documented as ADRs in [`docs/adr/`](./docs/adr).
 - [ADR-006: Mobile Navigation and State Architecture](./docs/adr/ADR-006-mobile-navigation-and-state-architecture.md)
 - [ADR-007: Offline Caching and Conflict Resolution](./docs/adr/ADR-007-offline-caching-and-conflict-resolution.md)
 - [ADR-008: Notification and Deep-Link Architecture](./docs/adr/ADR-008-notification-and-deep-link-architecture.md)
+- [ADR-010: Event Bus for Trade State Change Propagation](./docs/adr/adr-010-event-bus.md)
 
 ## 🔐 Security & Operations
 
