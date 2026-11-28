@@ -16,7 +16,8 @@
     "mutation:ci": "stryker run stryker.money-math.config.json --reporters html,json,progress",
     "spec:package": "node scripts/package-openapi.js",
     "codegen:client": "npm run spec:package && openapi-typescript dist/openapi.json -o ../frontend/src/lib/generated/api.ts && openapi-typescript dist/openapi.json -o ../mobile/src/api/generated/api.ts",
-    "codegen:check": "npm run codegen:client && git diff --exit-code -- ../frontend/src/lib/generated/api.ts ../mobile/src/api/generated/api.ts"
+    "codegen:check": "npm run codegen:client && git diff --exit-code -- ../frontend/src/lib/generated/api.ts ../mobile/src/api/generated/api.ts",
+    "test:load": "k6 run ../k6/deposit.js"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
