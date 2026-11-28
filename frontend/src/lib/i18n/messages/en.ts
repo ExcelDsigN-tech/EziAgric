@@ -96,6 +96,8 @@ const messages = {
     assetValue: "Asset Value",
     platformFee: "Platform Fee ({percent}%)",
     networkGasEst: "Network Gas Est.",
+    netSellerReceipt: "Net Seller Receipt",
+    netBuyerPayment: "Net Buyer Payment",
     totalTradeValue: "Total Trade Value",
     stellarPathPayment: "Stellar Path Payment",
     smartContractSecured: "SMART CONTRACT SECURED",
