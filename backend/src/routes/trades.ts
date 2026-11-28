@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createTradeSchema, updateTradeSchema } from '../schemas/tradeSchemas';
 import { logger } from '../utils/logger';
+import { buildPriceWarning } from '../services/priceFeedService';
 
 const router = Router();
 
@@ -67,7 +68,18 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
 router.post('/', authenticate, validate(createTradeSchema), async (req: Request, res: Response) => {
   try {
     const trade = await tradeService.createTrade(req.user!.id, req.body);
-    return res.status(201).json(trade);
+
+    // Informational only — never blocks trade creation.
+    const { commodity, quantity, price } = req.body ?? {};
+    let priceWarning: Awaited<ReturnType<typeof buildPriceWarning>> = null;
+    if (commodity && quantity && price) {
+      priceWarning = await buildPriceWarning(commodity, Number(price) / Number(quantity));
+    }
+
+    return res.status(201).json({
+      trade,
+      ...(priceWarning ? { priceWarning } : {}),
+    });
   } catch (error) {
     logger.error('Failed to create trade', { error });
     return res.status(500).json({ error: 'Failed to create trade' });
