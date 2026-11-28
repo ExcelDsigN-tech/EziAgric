@@ -20,20 +20,64 @@
 //! fee collector. Callers should be aware that very small amounts combined with
 //! small `fee_bps` values can round down to a zero fee.
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{contracttype, Address, Env};
 
-use crate::storage::{get_fee_bps, get_fee_collector, set_fee_collector};
+/// Storage keys for fee configuration.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FeeKey {
+    PlatformFeeBps,
+    FeeAddress,
+    TotalFeesCollected,
+}
 
-/// Returns the platform fee, in basis points, currently configured in storage.
+/// Default platform fee in basis points (0 = no fee).
+pub const DEFAULT_PLATFORM_FEE_BPS: u32 = 0;
+
+/// Read the configured platform fee in basis points.
 ///
 /// The value is read from persistent contract storage and is expected to be in
 /// the range `0..=10_000` (0% to 100%).
-///
-/// # Returns
-///
-/// The configured fee in basis points.
 pub fn get_platform_fee_bps(env: &Env) -> u32 {
-    get_fee_bps(env)
+    env.storage()
+        .instance()
+        .get(&FeeKey::PlatformFeeBps)
+        .unwrap_or(DEFAULT_PLATFORM_FEE_BPS)
+}
+
+/// Persist the platform fee in basis points.
+pub fn set_platform_fee_bps(env: &Env, bps: u32) {
+    env.storage()
+        .instance()
+        .set(&FeeKey::PlatformFeeBps, &bps);
+}
+
+/// Read the configured fee recipient address, if any.
+pub fn get_fee_address(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&FeeKey::FeeAddress)
+}
+
+/// Persist the fee recipient address.
+pub fn set_fee_address(env: &Env, address: &Address) {
+    env.storage()
+        .instance()
+        .set(&FeeKey::FeeAddress, address);
+}
+
+/// Read the cumulative total of fees collected across all settlements.
+pub fn get_total_fees(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&FeeKey::TotalFeesCollected)
+        .unwrap_or(0)
+}
+
+/// Add `amount` to the cumulative fee counter.
+pub fn add_total_fees(env: &Env, amount: i128) {
+    let total = get_total_fees(env) + amount;
+    env.storage()
+        .instance()
+        .set(&FeeKey::TotalFeesCollected, &total);
 }
 
 /// Computes the platform fee owed on `amount` at the given `fee_bps`.
@@ -41,15 +85,6 @@ pub fn get_platform_fee_bps(env: &Env) -> u32 {
 /// Uses the formula `amount * fee_bps / 10_000` with integer arithmetic, so the
 /// result is truncated toward zero. See the module-level docs for a worked
 /// example.
-///
-/// # Parameters
-///
-/// - `amount`: the gross trade amount, in the smallest token unit.
-/// - `fee_bps`: the fee rate in basis points (`10_000` = 100%).
-///
-/// # Returns
-///
-/// The fee amount, in the same unit as `amount`.
 ///
 /// # Overflow
 ///
@@ -63,15 +98,6 @@ pub fn calculate_fee(amount: i128, fee_bps: u32) -> i128 {
 ///
 /// Reads the configured fee via [`get_platform_fee_bps`] and delegates to
 /// [`calculate_fee`], so the same truncation and overflow behaviour applies.
-///
-/// # Parameters
-///
-/// - `env`: the contract environment used to read the configured fee.
-/// - `amount`: the gross trade amount, in the smallest token unit.
-///
-/// # Returns
-///
-/// The fee amount, in the same unit as `amount`.
 pub fn calculate_platform_fee(env: &Env, amount: i128) -> i128 {
     calculate_fee(amount, get_platform_fee_bps(env))
 }
@@ -81,38 +107,7 @@ pub fn calculate_platform_fee(env: &Env, amount: i128) -> i128 {
 /// The fee is computed with [`calculate_platform_fee`] and subtracted from the
 /// gross amount; the remainder is returned as the seller payout. Because the
 /// fee is truncated, `seller_amount + fee == amount` always holds.
-///
-/// # Parameters
-///
-/// - `env`: the contract environment used to read the configured fee.
-/// - `amount`: the gross trade amount, in the smallest token unit.
-///
-/// # Returns
-///
-/// A tuple `(seller_amount, fee)` where `seller_amount = amount - fee`.
 pub fn split_fee(env: &Env, amount: i128) -> (i128, i128) {
     let fee = calculate_platform_fee(env, amount);
     (amount - fee, fee)
-}
-
-/// Returns the address that collects platform fees, if one is configured.
-///
-/// # Returns
-///
-/// `Some(address)` when a fee collector has been set, otherwise `None`.
-pub fn get_platform_fee_collector(env: &Env) -> Option<Address> {
-    get_fee_collector(env)
-}
-
-/// Sets the address that collects platform fees.
-///
-/// Overwrites any previously configured collector. Authorization is expected to
-/// be enforced by the calling contract entry point.
-///
-/// # Parameters
-///
-/// - `env`: the contract environment used to persist the collector.
-/// - `collector`: the address that will receive platform fees.
-pub fn set_platform_fee_collector(env: &Env, collector: &Address) {
-    set_fee_collector(env, collector);
 }
