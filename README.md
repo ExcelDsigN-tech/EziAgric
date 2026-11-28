@@ -141,12 +141,9 @@ Amana enforces stack-level CI gates on pull requests through `.github/workflows/
 - **Backend Required Gate**: `npm ci`, `npm run build`, `npm test` in `backend/`
 - **Mobile Required Gate**: `npm ci`, `npm run type-check`, `npm run lint` in `mobile/`
 - **Contracts Required Gate**: `cargo test` in `contracts/amana_escrow/`
-<<<<<<< HEAD
   - Also builds the optimized WASM, posts its size and sha256 to the job summary, fails if it exceeds the size budget (`WASM_SIZE_BUDGET_BYTES`), and verifies a clean rebuild produces the same sha256
 - **Conventional PR Title**: PR titles must follow Conventional Commits (`.github/workflows/pr-title.yml`); see [CONTRIBUTING.md](CONTRIBUTING.md#commits-and-pr-titles)
-=======
 - **Architecture Diagrams Gate** (`.github/workflows/architecture-diagrams.yml`): renders the Mermaid diagrams in `docs/architecture/` and link-checks them on docs changes
->>>>>>> pr-484
 
 Path-aware execution is enabled to avoid unnecessary runtime. If a stack has no changed files, the gate reports a skip-note and passes.
 
@@ -420,6 +417,18 @@ Distributed under the MIT License. See `LICENSE` for more information.
 - #364: [Contract] Reject self-trades where buyer == seller
 <!-- handsoff-issue-426 -->
 - #426: [Frontend] Price reference widget on listing form
+
+<!-- handsoff-issue-912 -->
+- #912: [Contracts] Add get_trade_count view function
+
+<!-- handsoff-issue-913 -->
+- #913: [Contracts] Add configurable evidence submission deadline
+
+<!-- handsoff-issue-914 -->
+- #914: [Contracts] Add pause/unpause admin entrypoints for emergency stops
+
+<!-- handsoff-issue-915 -->
+- #915: [Contracts] Write Rustdoc for dispute.rs public functions
 
 <!-- handsoff-issue-1002 -->
 - #1002: [Contracts] Add per-token minimum trade amount
