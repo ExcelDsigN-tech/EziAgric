@@ -26,6 +26,7 @@ jobs:
   fmt-validate:
     name: fmt + validate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
@@ -48,6 +49,7 @@ jobs:
     # Fork PRs do not receive an OIDC token; they get fmt/validate only.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

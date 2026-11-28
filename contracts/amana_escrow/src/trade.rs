@@ -961,6 +961,11 @@ impl EscrowContract {
             .unwrap_or_else(|| soroban_sdk::Vec::new(&env))
     }
 
+    /// Returns a snapshot of cumulative contract counters: `(total_trades, total_disputes, total_resolved)`.
+    ///
+    /// - `total_trades`   – number of trades ever created via `create_trade`
+    /// - `total_disputes` – number of disputes ever raised via `initiate_dispute`
+    /// - `total_resolved` – number of disputes resolved via `resolve_dispute`
     pub fn get_contract_metrics(env: Env) -> (u64, u64, u64) {
         let total_trades: u64 = env
             .storage()
