@@ -37,6 +37,9 @@ on:
       - "CONTRIBUTING.md"
       - "pnpm-lock.yaml"
 
+env:
+  NODE_VERSION: "22"
+
 jobs:
   changes:
     name: Detect Changed Stacks
@@ -98,7 +101,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Check architecture diagrams (syntax, previews, links)
         if: needs.changes.outputs.docs == 'true'
@@ -120,7 +123,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Validate quarantine registry (no expired entries)
         run: node scripts/validate-flaky-quarantine.mjs
@@ -144,7 +147,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
@@ -230,7 +233,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Check generated event clients are up to date
         run: node scripts/codegen-events.mjs --check
@@ -267,7 +270,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
 
@@ -315,7 +318,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install ts-node
         run: npm install -g ts-node typescript --prefer-offline
@@ -342,7 +345,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: backend/pnpm-lock.yaml
 
@@ -446,7 +449,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install deps
         if: needs.changes.outputs.mobile == 'true'
@@ -487,7 +490,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: mobile/pnpm-lock.yaml
 
@@ -563,7 +566,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
           cache-dependency-path: mobile/pnpm-lock.yaml
 
