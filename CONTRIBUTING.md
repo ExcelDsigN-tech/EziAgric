@@ -119,6 +119,33 @@ Mark breaking changes with `!` after the type/scope (`feat(api)!: ...`) or a `BR
   description why no diagram changed when that is not obvious — see
   [docs/architecture/README.md](docs/architecture/README.md).
 
+## Load testing
+
+Write-path load tests live under `k6/` and use [k6](https://k6.io). Each scenario targets one endpoint group:
+
+| File | Coverage |
+|---|---|
+| `k6/deposit.js` | `POST /api/v1/trades/:id/deposit` |
+| `k6/confirm.js` | `POST /api/v1/trades/:id/confirm` |
+| `k6/dispute.js` | `POST /api/v1/trades/:id/dispute` |
+
+**Environment variables:**
+
+| Variable | Description |
+|---|---|
+| `K6_API_URL` | Base URL of the target API, e.g. `https://staging.eziagric.app` |
+| `K6_AUTH_TOKEN` | Bearer token for an authenticated test user |
+| `K6_VUS` | Number of virtual users (default: 10) |
+| `K6_DURATION` | Test duration, e.g. `30s` (default: `30s`) |
+
+Run locally:
+```sh
+K6_API_URL=http://localhost:4000 K6_AUTH_TOKEN=<token> k6 run k6/deposit.js
+```
+
+Add a new scenario file when introducing a new write endpoint expected to receive high traffic.
+See #690 for the initial k6 coverage milestone.
+
 ## Where do implementation and PR notes go?
 
 Do **not** add implementation notes, PR summaries, or wave/issue write-ups to the repository root. The root should only contain project-level files (e.g. `README.md`, `CONTRIBUTING.md`, `LICENSE`, config files).
