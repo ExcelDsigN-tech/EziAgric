@@ -75,6 +75,36 @@ jobs:
           path: trivy-${{ strategy.job-index }}.txt
           retention-days: 30
 
+  backend-image-scan:
+    name: Backend application image scan
+    runs-on: ubuntu-latest
+    needs: trivyignore-expiry
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build backend image
+        run: docker build --target runtime -t backend-scan:ci ./backend
+
+      - name: Trivy scan — backend application image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: backend-scan:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          output: trivy-backend.txt
+
+      - name: Upload backend scan output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-image-backend
+          path: trivy-backend.txt
+          retention-days: 30
+
   iac-scan:
     name: IaC misconfig scan (compose + k8s)
     runs-on: ubuntu-latest
