@@ -6,8 +6,10 @@ name: k6 Performance Budgets
 #                     hot path changes; a budget breach fails the required
 #                     check and posts a readable diff table on the PR.
 #   * schedule      → nightly full-load run against staging; results are
-#                     appended to the `perf-trends` branch and a Markdown
-#                     trend dashboard is regenerated.
+#                     appended to the `perf-trends` branch, pushed to the
+#                     Prometheus Pushgateway (Grafana dashboard + breach
+#                     alert in infra/), and a Markdown trend dashboard is
+#                     regenerated.
 #   * workflow_dispatch (mode=slowdown-experiment) → injects latency via a
 #                     proxy and asserts the gate trips. Proves the budgets
 #                     actually block regressions.
@@ -267,7 +269,19 @@ jobs:
             --profile full \
             --output k6-budget-report-full.md \
             --trend-file perf-trends/full.jsonl \
-            --sha "$GITHUB_SHA"
+            --sha "$GITHUB_SHA" \
+            --metrics-output k6-budget-metrics-full.prom
+
+      - name: Push budget metrics to Pushgateway
+        if: always() && hashFiles('k6-budget-metrics-full.prom') != ''
+        env:
+          PUSHGATEWAY_URL: ${{ secrets.PUSHGATEWAY_URL }}
+        run: |
+          if [ -z "$PUSHGATEWAY_URL" ]; then
+            echo "::warning::PUSHGATEWAY_URL is not configured; budget metrics were not pushed to Prometheus"; exit 0
+          fi
+          curl -fsS --retry 3 --data-binary @k6-budget-metrics-full.prom \
+            "$PUSHGATEWAY_URL/metrics/job/k6_perf_budgets/profile/full"
 
       - name: Render trend dashboard
         if: always()
